@@ -17,7 +17,7 @@ for idx, commit in enumerate(commits, start=1):
     raw_msg = commit.message.strip().splitlines()[0]
 
     # 格式化 commit message（替换冒号、空格）
-    safe_msg = re.sub(r'[:\s]+', '-', raw_msg)
+    safe_msg = re.sub(r"[:\s]+", "-", raw_msg)
 
     # 构造分支名
     branch_name = f"learn/{idx}-{safe_msg}"
