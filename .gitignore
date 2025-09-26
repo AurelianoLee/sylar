@@ -28,3 +28,8 @@ stamp-h1
 *.pc
 depcomp
 *.xcodeproj
+
+.DS_Store
+# /.vscode
+/build
+/.cache
