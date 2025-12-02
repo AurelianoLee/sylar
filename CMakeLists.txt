@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.10)
 project(sylar)
 
 #add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/thirdpart/yaml-cpp)
@@ -6,12 +6,28 @@ project(sylar)
 #add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/thirdpart/sqlite-3.28.0)
 #add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/thirdpart/tinyxml2-7.0.1)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)  # 强制要求该标准，否则报错
+set(CMAKE_CXX_EXTENSIONS OFF) # ON / 未设置 生成 -std=gnu++17, OFF 生成 -std=c++17
+add_definitions(-D_XOPEN_SOURCE=600)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include (cmake/utils.cmake)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
-set(CMAKE_CXX_FLAGS "$ENV{CXXFLAGS} -rdynamic -O3 -fPIC -ggdb -std=c++11 -Wall -Wno-deprecated -Werror -Wno-unused-function -Wno-builtin-macro-redefined -Wno-deprecated-declarations")
-set(CMAKE_C_FLAGS "$ENV{CXXFLAGS} -rdynamic -O3 -fPIC -ggdb -std=c11 -Wall -Wno-deprecated -Werror -Wno-unused-function -Wno-builtin-macro-redefined -Wno-deprecated-declarations")
+# set(CMAKE_CXX_FLAGS "$ENV{CXXFLAGS} -rdynamic -O3 -fPIC -ggdb -Wall -Wno-deprecated -Werror -Wno-unused-function -Wno-builtin-macro-redefined -Wno-deprecated-declarations")
+# set(CMAKE_C_FLAGS "$ENV{CXXFLAGS} -rdynamic -O3 -fPIC -ggdb -Wall -Wno-deprecated -Werror -Wno-unused-function -Wno-builtin-macro-redefined -Wno-deprecated-declarations")
+
+set(COMMON_FLAGS "-O3 -fPIC -ggdb -Wall -Wno-deprecated -Werror -Wno-unused-function -Wno-builtin-macro-redefined -Wno-deprecated-declarations -Wno-inconsistent-missing-override")
+
+if(APPLE)
+    # macOS 配置
+    set(CMAKE_CXX_FLAGS "$ENV{CXXFLAGS} ${COMMON_FLAGS} -Wno-unused-command-line-argument -Wno-unknown-warning-option")
+    set(CMAKE_C_FLAGS   "$ENV{CFLAGS}   ${COMMON_FLAGS} -Wno-unused-command-line-argument -Wno-unknown-warning-option")
+else()
+    # Linux 配置
+    set(CMAKE_CXX_FLAGS "$ENV{CXXFLAGS} -rdynamic ${COMMON_FLAGS}")
+    set(CMAKE_C_FLAGS   "$ENV{CFLAGS}   -rdynamic ${COMMON_FLAGS}")
+endif()
 
 include_directories(.)
 include_directories(/apps/sylar/include)
@@ -30,9 +46,24 @@ if(Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
 endif()
 
-find_package(MySQL REQUIRED)
-if(MYSQL_FOUND)
-    include_directories(${MYSQL_INCLUDE_DIR})
+# find_package(MySQL REQUIRED)
+# if(MYSQL_FOUND)
+#     include_directories(${MYSQL_INCLUDE_DIR})
+#     get_filename_component(MYSQL_PARENT_INCLUDE_DIR ${MYSQL_INCLUDE_DIR} DIRECTORY)
+#     message(STATUS "Fixing MySQL include path for macOS: ${MYSQL_PARENT_INCLUDE_DIR}")
+#     include_directories(${MYSQL_PARENT_INCLUDE_DIR})
+# endif()
+if(APPLE)
+    # 包含了 /include 和 /include/mysql 两层，确保 "mysql.h" 和 "mysql/mysql.h" 都能找到
+    include_directories("/opt/homebrew/opt/mysql-client/include")
+    include_directories("/opt/homebrew/opt/mysql-client/include/mysql")
+    link_directories("/opt/homebrew/opt/mysql-client/lib")
+    message(STATUS "Mac Force Fix: Added MySQL include paths manually.")
+else()
+    find_package(MySQL REQUIRED)
+    if(MYSQL_FOUND)
+        include_directories(${MYSQL_INCLUDE_DIR})
+    endif()
 endif()
 
 find_package(Protobuf)
@@ -136,23 +167,51 @@ find_library(PTHREAD pthread)
 #set(LIBS ${LIBS} ${YAMLCPP})
 #set(LIBS ${LIBS} ${PTHREAD})
 
+# set(LIBS
+#         sylar
+#         dl
+#         pthread
+#         yaml-cpp
+#         jsoncpp
+#         ${ZLIB_LIBRARIES}
+#         ${OPENSSL_LIBRARIES}
+#         ${PROTOBUF_LIBRARIES}
+#         event
+#         hiredis_vip
+#         mysqlclient_r
+#         zookeeper_mt
+#         sqlite3
+#         tinyxml2
+#         jemalloc
+#         )
+
 set(LIBS
-        sylar
+    sylar
+    yaml-cpp
+    jsoncpp
+    ${ZLIB_LIBRARIES}
+    ${OPENSSL_LIBRARIES}
+    ${PROTOBUF_LIBRARIES}
+    event
+    hiredis_vip
+    zookeeper_mt
+    sqlite3
+    tinyxml2
+)
+
+if(NOT APPLE)
+    list(APPEND LIBS
         dl
         pthread
-        yaml-cpp
-        jsoncpp
-        ${ZLIB_LIBRARIES}
-        ${OPENSSL_LIBRARIES}
-        ${PROTOBUF_LIBRARIES}
-        event
-        hiredis_vip
-        mysqlclient_r
-        zookeeper_mt
-        sqlite3
-        tinyxml2
-        jemalloc
-        )
+        mysqlclient_r  # Linux 下通常用这个
+        jemalloc       # Linux 下推荐用这个优化性能
+    )
+else()
+    list(APPEND LIBS
+        mysqlclient    # macOS/Homebrew 下只有这个名字
+    )
+endif()
+
 sylar_add_executable(test_util "tests/test_util.cc" sylar "${LIBS}")
 sylar_add_executable(test_hashmultimap "tests/test_hashmultimap.cc" sylar "${LIBS}")
 sylar_add_executable(test_hashmap "tests/test_hashmap.cc" sylar "${LIBS}")

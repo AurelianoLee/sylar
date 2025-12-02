@@ -357,32 +357,52 @@ public:
      * @brief 构造函数
      */
     Spinlock() {
+#if defined (__APPLE__)
+        pthread_mutex_init(&m_mutex, NULL);
+#else
         pthread_spin_init(&m_mutex, 0);
+#endif
     }
 
     /**
      * @brief 析构函数
      */
     ~Spinlock() {
+#if defined (__APPLE__)
+        pthread_mutex_destroy(&m_mutex);
+#else   
         pthread_spin_destroy(&m_mutex);
+#endif
     }
 
     /**
      * @brief 上锁
      */
     void lock() {
+#if defined (__APPLE__)
+        pthread_mutex_lock(&m_mutex);
+#else
         pthread_spin_lock(&m_mutex);
+#endif
     }
 
     /**
      * @brief 解锁
      */
     void unlock() {
+#if defined (__APPLE__)
+        pthread_mutex_unlock(&m_mutex);
+#else
         pthread_spin_unlock(&m_mutex);
+#endif
     }
 private:
-    /// 自旋锁
+    /// 根据平台选择锁的类型
+#if defined(__APPLE__)
+    pthread_mutex_t m_mutex;
+#else
     pthread_spinlock_t m_mutex;
+#endif
 };
 
 /**
