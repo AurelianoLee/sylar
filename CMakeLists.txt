@@ -8,7 +8,7 @@ project(sylar)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)  # 强制要求该标准，否则报错
-set(CMAKE_CXX_EXTENSIONS OFF) # ON / 未设置 生成 -std=gnu++17, OFF 生成 -std=c++17
+set(CMAKE_CXX_EXTENSIONS ON) # ON / 未设置 生成 -std=gnu++17, OFF 生成 -std=c++17
 add_definitions(-D_XOPEN_SOURCE=600)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include (cmake/utils.cmake)

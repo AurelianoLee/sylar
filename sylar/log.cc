@@ -13,13 +13,14 @@ namespace sylar {
 
 const char* LogLevel::ToString(LogLevel::Level level) {
     switch(level) {
+        // 一段宏定义，LogLevel::name 文本替换
 #define XX(name) \
     case LogLevel::name: \
         return #name; \
         break;
 
-    XX(DEBUG);
-    XX(INFO);
+    XX(DEBUG);  // Q: xx(DEBUG) 是谁给谁赋值？
+    XX(INFO);   // A: XX(DEBUG) 的意思是：“编译器，请帮我把 DEBUG 这个词，填空填到上面的模板里去。”
     XX(WARN);
     XX(ERROR);
     XX(FATAL);
@@ -30,6 +31,7 @@ const char* LogLevel::ToString(LogLevel::Level level) {
     return "UNKNOW";
 }
 
+// 字符串转枚举 (String to Enum)
 LogLevel::Level LogLevel::FromString(const std::string& str) {
 #define XX(level, v) \
     if(str == #v) { \
@@ -50,25 +52,38 @@ LogLevel::Level LogLevel::FromString(const std::string& str) {
 #undef XX
 }
 
-LogEventWrap::LogEventWrap(LogEvent::ptr e)
-    :m_event(e) {
-}
+// 构造函数，
+LogEventWrap::LogEventWrap(LogEvent::ptr e) : m_event(e) {}
 
+// 析构函数里做了什么？ 它执行了“日志写入”的最后一步：
+// m_event->getLogger()：找到管理这个日志的“日志器”（Logger）。
+// ->log(...)：调用 Logger 的 log 方法。
+// 参数：把当前的日志级别（Level）和日志事件本身（m_event，包含你刚才 << 进去的所有内容）传给 Logger。
 LogEventWrap::~LogEventWrap() {
     m_event->getLogger()->log(m_event->getLevel(), m_event);
 }
 
+// 这个函数仅仅是一个包装器 (Wrapper)。它负责把 ... 变成 va_list 对象，然后传给内部函数去处理。
 void LogEvent::format(const char* fmt, ...) {
+    // va 可变参数相关操作
     va_list al;
+    // 原理: 计算机需要知道参数从哪里开始。fmt 是 ... 之前的最后一个确定的参数。va_start 会根据 fmt 在内存中的地址，
+    // 计算出第一个可变参数的地址，并将 al 指向那里。
+    // 为什么需要 fmt: 只有知道确定的参数在哪里，才能找到后面不确定的参数。
     va_start(al, fmt);
     format(fmt, al);
+    // 用完后把袋子销毁（防止内存问题，虽然在某些架构上是空操作，但必须写）。
     va_end(al);
 }
 
 void LogEvent::format(const char* fmt, va_list al) {
     char* buf = nullptr;
+    // vasprintf 函数的功能：按 fmt 和 al 格式化，自动分配足够大的内存并把指针返回给第一个参数。
+    // 注：vasprintf 是 GNU/BSD 扩展（并非 C++ 标准函数），在不同平台上可用性需确认。
     int len = vasprintf(&buf, fmt, al);
     if(len != -1) {
+        // 把 buf 指向的内容（长度为 len）拷贝到一个 std::string，然后写入成员 stringstream m_ss（累积日志消息）。
+        // 使用带长度的 string 构造，避免依赖 '\0'。
         m_ss << std::string(buf, len);
         free(buf);
     }
@@ -80,6 +95,18 @@ std::stringstream& LogEventWrap::getSS() {
 
 
 void LogAppender::setFormatter(LogFormatter::ptr val) {
+    // :: 在这里表示“属于这个类的成员类型”。
+    // 这是一种非常经典的 C++ 泛型编程和解耦技巧。
+    // 假设某天你发现多线程竞争太激烈，自旋锁（Spinlock）效率低，想换成互斥锁（std::mutex）或者读写锁。
+    // 如果你没有用 MutexType： 你需要去代码里把所有的 Spinlock::Lock 改成 std::unique_lock<std::mutex>，
+    // 改动几百处，容易出错。
+    // 如果你用了 MutexType： 你只需要修改 LogAppender 里的一行代码：
+    // 原来是：
+    // typedef Spinlock MutexType; 
+    // 现在改成：
+    // typedef MyMutex MutexType; // 只要 MyMutex 里也有一个叫 Lock 的定义
+    // 1. MutexType 是 Spinlock 的别名
+    // 2. Spinlock::Lock 查找这个类作用域内的类型别名
     MutexType::Lock lock(m_mutex);
     m_formatter = val;
     if(m_formatter) {
@@ -90,6 +117,8 @@ void LogAppender::setFormatter(LogFormatter::ptr val) {
 }
 
 LogFormatter::ptr LogAppender::getFormatter() {
+    // 创建一个临时变量 lock
+    // RAII 自动控制锁，创建时自动上锁，离开作用域时销毁对象，自动解锁。
     MutexType::Lock lock(m_mutex);
     return m_formatter;
 }

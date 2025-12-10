@@ -323,6 +323,7 @@ public:
 
     /**
      * @brief 日志内容项格式化
+     * 策略模式
      */
     class FormatItem {
     public:
